@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Tools</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      flex-direction: column;
+    }
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 800px;
+      margin: 1rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: #007bff;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin: 0.5rem 0;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .sub-section {
+      margin-left: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Solana Tools</h1>
+
+    <!-- Wallet Manager Section -->
+    <div class="section">
+      <h2>Wallet Manager</h2>
+      <button id="connectWallet">Connect Wallet</button>
+      <p id="walletAddress">Wallet Address: Not connected</p>
+      <button id="batchWalletGeneration">Batch Wallet Generation</button>
+    </div>
+
+    <!-- Multisender Section -->
+    <div class="section">
+      <h2>Multisender</h2>
+      <div class="sub-section">
+        <h3>One-to-Many</h3>
+        <textarea id="oneToManyRecipients" placeholder="Enter recipient addresses (one per line)"></textarea>
+        <input type="text" id="oneToManyAmount" placeholder="Enter token amount">
+        <button id="oneToManySend">Send Tokens</button>
+      </div>
+      <div class="sub-section">
+        <h3>Many-to-One</h3>
+        <textarea id="manyToOneSenders" placeholder="Enter sender addresses (one per line)"></textarea>
+        <input type="text" id="manyToOneAmount" placeholder="Enter token amount">
+        <button id="manyToOneSend">Send Tokens</button>
+      </div>
+      <div class="sub-section">
+        <h3>Many-to-Many</h3>
+        <textarea id="manyToManySenders" placeholder="Enter sender addresses (one per line)"></textarea>
+        <textarea id="manyToManyRecipients" placeholder="Enter recipient addresses (one per line)"></textarea>
+        <input type="text" id="manyToManyAmount" placeholder="Enter token amount">
+        <button id="manyToManySend">Send Tokens</button>
+      </div>
+      <div class="sub-section">
+        <h3>SOL Relay Transfer</h3>
+        <textarea id="solRelayRecipients" placeholder="Enter recipient addresses (one per line)"></textarea>
+        <input type="text" id="solRelayAmount" placeholder="Enter SOL amount">
+        <button id="solRelaySend">Send SOL</button>
+      </div>
+    </div>
+
+    <!-- Bundled Section -->
+    <div class="section">
+      <h2>Bundled Section</h2>
+      <button id="bundledBuy">Bundled Buy</button>
+      <button id="bundledSell">Bundled Sell</button>
+      <button id="sellAndBundledBuy">Sell and Bundled Buy</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+  <script>
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet')); // Use devnet for testing
+    let wallet;
+
+    // Connect Wallet
+    document.getElementById('connectWallet').addEventListener('click', async () => {
+      if (window.solana && window.solana.isPhantom) {
+        try {
+          const response = await window.solana.connect();
+          wallet = response.publicKey;
+          document.getElementById('walletAddress').textContent = `Wallet Address: ${wallet.toString()}`;
+          alert('Wallet connected successfully!');
+        } catch (error) {
+          console.error('Error connecting wallet:', error);
+        }
+      } else {
+        alert('Please install Phantom Wallet!');
+      }
+    });
+
+    // Batch Wallet Generation
+    document.getElementById('batchWalletGeneration').addEventListener('click', () => {
+      const wallets = [];
+      for (let i = 0; i < 5; i++) { // Generate 5 wallets
+        const keypair = solanaWeb3.Keypair.generate();
+        wallets.push(keypair.publicKey.toString());
+      }
+      alert('Batch wallets generated:\n' + wallets.join('\n'));
+    });
+
+    // One-to-Many Send Tokens
+    document.getElementById('oneToManySend').addEventListener('click', async () => {
+      if (!wallet) {
+        alert('Please connect your wallet first.');
+        return;
+      }
+
+      const recipients = document.getElementById('oneToManyRecipients').value.split('\n');
+      const amount = parseFloat(document.getElementById('oneToManyAmount').value);
+
+      if (recipients.length === 0 || isNaN(amount)) {
+        alert('Please enter valid recipient addresses and token amount.');
+        return;
+      }
+
+      try {
+        for (const recipient of recipients) {
+          const recipientPublicKey = new solanaWeb3.PublicKey(recipient.trim());
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: wallet,
+              toPubkey: recipientPublicKey,
+              lamports: amount * solanaWeb3.LAMPORTS_PER_SOL, // Convert SOL to lamports
+            })
+          );
+
+          const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [wallet]);
+          console.log('Transaction signature:', signature);
+        }
+
+        alert('Tokens sent successfully!');
+      } catch (error) {
+        console.error('Error sending tokens:', error);
+        alert('Failed to send tokens. Please try again.');
+      }
+    });
+
+    // Many-to-One Send Tokens
+    document.getElementById('manyToOneSend').addEventListener('click', async () => {
+      if (!wallet) {
+        alert('Please connect your wallet first.');
+        return;
+      }
+
+      const senders = document.getElementById('manyToOneSenders').value.split('\n');
+      const amount = parseFloat(document.getElementById('manyToOneAmount').value);
+
+      if (senders.length === 0 || isNaN(amount)) {
+        alert('Please enter valid sender addresses and token amount.');
+        return;
+      }
+
+      try {
+        for (const sender of senders) {
+          const senderPublicKey = new solanaWeb3.PublicKey(sender.trim());
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: senderPublicKey,
+              toPubkey: wallet,
+              lamports: amount * solanaWeb3.LAMPORTS_PER_SOL, // Convert SOL to lamports
+            })
+          );
+
+          const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [wallet]);
+          console.log('Transaction signature:', signature);
+        }
+
+        alert('Tokens received successfully!');
+      } catch (error) {
+        console.error('Error receiving tokens:', error);
+        alert('Failed to receive tokens. Please try again.');
+      }
+    });
+
+    // Many-to-Many Send Tokens
+    document.getElementById('manyToManySend').addEventListener('click', async () => {
+      if (!wallet) {
+        alert('Please connect your wallet first.');
+        return;
+      }
+
+      const senders = document.getElementById('manyToManySenders').value.split('\n');
+      const recipients = document.getElementById('manyToManyRecipients').value.split('\n');
+      const amount = parseFloat(document.getElementById('manyToManyAmount').value);
+
+      if (senders.length === 0 || recipients.length === 0 || isNaN(amount)) {
+        alert('Please enter valid sender and recipient addresses and token amount.');
+        return;
+      }
+
+      try {
+        for (let i = 0; i < senders.length; i++) {
+          const senderPublicKey = new solanaWeb3.PublicKey(senders[i].trim());
+          const recipientPublicKey = new solanaWeb3.PublicKey(recipients[i].trim());
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: senderPublicKey,
+              toPubkey: recipientPublicKey,
+              lamports: amount * solanaWeb3.LAMPORTS_PER_SOL, // Convert SOL to lamports
+            })
+          );
+
+          const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [wallet]);
+          console.log('Transaction signature:', signature);
+        }
+
+        alert('Tokens sent successfully!');
+      } catch (error) {
+        console.error('Error sending tokens:', error);
+        alert('Failed to send tokens. Please try again.');
+      }
+    });
+
+    // SOL Relay Transfer
+    document.getElementById('solRelaySend').addEventListener('click', async () => {
+      if (!wallet) {
+        alert('Please connect your wallet first.');
+        return;
+      }
+
+      const recipients = document.getElementById('solRelayRecipients').value.split('\n');
+      const amount = parseFloat(document.getElementById('solRelayAmount').value);
+
+      if (recipients.length === 0 || isNaN(amount)) {
+        alert('Please enter valid recipient addresses and SOL amount.');
+        return;
+      }
+
+      try {
+        for (const recipient of recipients) {
+          const recipientPublicKey = new solanaWeb3.PublicKey(recipient.trim());
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: wallet,
+              toPubkey: recipientPublicKey,
+              lamports: amount * solanaWeb3.LAMPORTS_PER_SOL, // Convert SOL to lamports
+            })
+          );
+
+          const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [wallet]);
+          console.log('Transaction signature:', signature);
+        }
+
+        alert('SOL sent successfully!');
+      } catch (error) {
+        console.error('Error sending SOL:', error);
+        alert('Failed to send SOL. Please try again.');
+      }
+    });
+
+    // Bundled Buy (Placeholder)
+    document.getElementById('bundledBuy').addEventListener('click', () => {
+      alert('Bundled Buy functionality will be added later.');
+    });
+
+    // Bundled Sell (Placeholder)
+    document.getElementById('bundledSell').addEventListener('click', () => {
+      alert('Bundled Sell functionality will be added later.');
+    });
+
+    // Sell and Bundled Buy (Placeholder)
+    document.getElementById('sellAndBundledBuy').addEventListener('click', () => {
+      alert('Sell and Bundled Buy functionality will be added later.');
+    });
+  </script>
+</body>
+</html>
